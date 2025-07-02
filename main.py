@@ -7,13 +7,21 @@ import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import random
 
-tiempo_total = 1 * 1000  # ms
 
+#
+# Parametros
+#
+
+tiempo_total = 2* 1000  # ms
+tiempo_paso_simulacion = 50 #ms, tiempo para graficar cada ciclo
+
+# Configurables mediante casillas de texto
 params = {
-    "tam_buffer_receptor": 16 * 1000,
-    "nivel_deseado_porcentaje": 0.95,
-    "mss": 536,
-    "tiempo_scan": 14,
+    "tam_buffer_receptor": 16 * 1000, # Bytes, determina el error superior
+    "nivel_deseado_porcentaje": 0.95, # Valor nominal
+    "mss": 536,                       # Tamaño máximo por ciclo
+    "tiempo_scan": 14,                # Tiempo de scan
+    "consumo_aplicacion": 128,        # Numero de bytes consumidos por ciclo
 }
 
 
@@ -22,7 +30,8 @@ def nivel_deseado():
 
 
 def fin_estado_transitorio():
-    return nivel_deseado() * (params["tiempo_scan"] / params["mss"])
+    cambio_total = params["mss"] - params["consumo_aplicacion"]
+    return nivel_deseado() * (params["tiempo_scan"] / cambio_total)
 
 
 #
@@ -34,12 +43,13 @@ def gen_pasos():
     while True:
         t += params["tiempo_scan"]
         espacio_disponible = nivel_deseado() - ocupacion_buffer
-        print(espacio_disponible)
         salida_controlador = min(espacio_disponible, params["mss"])
         perturbacion = perturbacion_por_perdida()
         datos_recibidos = max(salida_controlador + perturbacion, 0)
         perdida = -perturbacion if salida_controlador > 0 else 0
-        ocupacion_buffer += datos_recibidos  # salida
+
+        ocupacion_buffer += datos_recibidos 
+        ocupacion_buffer = max(ocupacion_buffer - params["consumo_aplicacion"], 0) 
 
         yield t, espacio_disponible, salida_controlador, perdida, datos_recibidos, ocupacion_buffer
 
@@ -113,7 +123,7 @@ def main():
 
     gen = gen_pasos()
     ani = animation.FuncAnimation(
-        plot["fig"], update, gen, interval=200, cache_frame_data=False
+        plot["fig"], update, gen, interval=tiempo_paso_simulacion, cache_frame_data=False
     )
     plt.tight_layout()
 
@@ -137,15 +147,15 @@ def main():
 
         gen = gen_pasos()
         ani = animation.FuncAnimation(
-            plot["fig"], update, gen, interval=200, cache_frame_data=False
+            plot["fig"], update, gen, interval=tiempo_paso_simulacion, cache_frame_data=False
         )
         canvas.draw_idle()
 
     # GUI
     canvas.draw()
 
-    mpl_toolbar = NavigationToolbar2Tk(canvas, root, pack_toolbar=False)
-    mpl_toolbar.update()
+    # mpl_toolbar = NavigationToolbar2Tk(canvas, root, pack_toolbar=False)
+    # mpl_toolbar.update()
 
     config_bar = tkinter.Frame(master=root)
     config_bar.pack(side=tkinter.TOP, fill=tkinter.X)
@@ -189,7 +199,7 @@ def main():
     apply_btn = tkinter.Button(config_bar, text="Aplicar", command=apply_params)
     apply_btn.pack(side=tkinter.LEFT, padx=2, pady=2)
 
-    mpl_toolbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
+    # mpl_toolbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
     canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=True)
 
     tkinter.mainloop()
@@ -237,7 +247,7 @@ def setup_plots():
     for ax in (ax_salida, ax_error, ax_controlador, ax_perturbacion, ax_recibidos):
         ax.set_ylabel("Bytes")
         ax.grid(True)
-        ax.legend()
+        ax.legend(loc="lower right")
         ax.set_xbound(lower=0)
         # ax.set_xlim(0, 2000) #Si queremos que todos los graficos esten limitados inicialmente entre 0 y 2000 bytes
 
