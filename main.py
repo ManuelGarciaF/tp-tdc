@@ -1,26 +1,41 @@
 #!/usr/bin/env python3
 
+import tkinter
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.animation as animation
 import random
 
-tam_buffer_receptor = 16 * 1000
-nivel_deseado = tam_buffer_receptor * 0.95  # tita_i
-mss = 536  # default ipv4
 tiempo_total = 1 * 1000  # ms
-tiempo_scan = 14  # ms, definido por el rtt
 
-fin_estado_transitorio = nivel_deseado * (tiempo_scan / mss)
+params = {
+    "tam_buffer_receptor": 16 * 1000,
+    "nivel_deseado_porcentaje": 0.95,
+    "mss": 536,
+    "tiempo_scan": 14,
+}
 
 
+def nivel_deseado():
+    return params["nivel_deseado_porcentaje"] * params["tam_buffer_receptor"]
+
+
+def fin_estado_transitorio():
+    return nivel_deseado() * (params["tiempo_scan"] / params["mss"])
+
+
+#
+# Lógica de la simulación
+#
 def gen_pasos():
     t = 0
     ocupacion_buffer = 0
     while True:
-        t += tiempo_scan
-        espacio_disponible = nivel_deseado - ocupacion_buffer
-        salida_controlador = min(espacio_disponible, mss)
+        t += params["tiempo_scan"]
+        espacio_disponible = nivel_deseado() - ocupacion_buffer
+        print(espacio_disponible)
+        salida_controlador = min(espacio_disponible, params["mss"])
         perturbacion = perturbacion_por_perdida()
         datos_recibidos = max(salida_controlador + perturbacion, 0)
         perdida = -perturbacion if salida_controlador > 0 else 0
@@ -38,19 +53,26 @@ def perturbacion_por_perdida():
     return -random.randint(1, 64)
 
 
-salidas = []
-errores = []
-salidas_controlador = []
-recibidos = []
-perdidas = []
-tiempos = []
-
-
+#
+# No mirar, codigo horrible para GUI y plots
+#
 def main():
+    salidas = [0]
+    errores = [0]
+    salidas_controlador = [0]
+    recibidos = [0]
+    perdidas = [0]
+    tiempos = [0]
 
-    # Plot
+    # Plot to fill with data
     plot = setup_plots()
 
+    # Setup window
+    root = tkinter.Tk()
+    root.wm_title("Simulacion Control de flujo TCP")
+    canvas = FigureCanvasTkAgg(plot["fig"], master=root)
+
+    # Update plot function
     def update(data):
         (
             t,
@@ -86,17 +108,95 @@ def main():
                 ax.set_xlim(0, tiempo_total)
                 ax.autoscale_view(scalex=False)
 
+        canvas.draw_idle()
         return plot["lines"].values()
 
+    gen = gen_pasos()
     ani = animation.FuncAnimation(
-        plot["fig"], update, gen_pasos, interval=200, save_count=200
+        plot["fig"], update, gen, interval=200, cache_frame_data=False
     )
     plt.tight_layout()
-    plt.show()
+
+    def reset():
+        nonlocal ani
+        nonlocal gen
+        ani.event_source.stop()
+        del ani
+
+        for data_list in (
+            salidas,
+            errores,
+            salidas_controlador,
+            recibidos,
+            perdidas,
+            tiempos,
+        ):
+            data_list.clear()
+        for line in plot["lines"].values():
+            line.set_data([], [])
+
+        gen = gen_pasos()
+        ani = animation.FuncAnimation(
+            plot["fig"], update, gen, interval=200, cache_frame_data=False
+        )
+        canvas.draw_idle()
+
+    # GUI
+    canvas.draw()
+
+    mpl_toolbar = NavigationToolbar2Tk(canvas, root, pack_toolbar=False)
+    mpl_toolbar.update()
+
+    config_bar = tkinter.Frame(master=root)
+    config_bar.pack(side=tkinter.TOP, fill=tkinter.X)
+
+    button_pause = tkinter.Button(
+        master=config_bar, text="Pausar", command=ani.event_source.stop
+    )
+    button_resume = tkinter.Button(
+        master=config_bar, text="Resumir", command=ani.event_source.start
+    )
+
+    button_reset = tkinter.Button(master=config_bar, text="Reiniciar", command=reset)
+
+    button_pause.pack(side=tkinter.LEFT, padx=2, pady=2)
+    button_resume.pack(side=tkinter.LEFT, padx=2, pady=2)
+    button_reset.pack(side=tkinter.LEFT, padx=2, pady=2)
+
+    entries = {}
+    for i, (key, val) in enumerate(params.items()):
+        label = tkinter.Label(config_bar, text=key)
+        label.pack(side=tkinter.LEFT, padx=2, pady=2)
+
+        var = tkinter.StringVar(value=str(val))
+        entry = tkinter.Entry(config_bar, textvariable=var, width=10)
+        entry.pack(side=tkinter.LEFT, padx=2, pady=2)
+        entries[key] = var
+
+    def apply_params():
+        for key, var in entries.items():
+            try:
+                params[key] = int(var.get())
+            except ValueError:
+                params[key] = float(var.get())
+
+        # Actualizar reglas
+        plot["hlines"]["lh_valor_nominal"].set_ydata([nivel_deseado(), nivel_deseado()])
+        plot["hlines"]["lh_limite_error"].set_ydata([params["tam_buffer_receptor"], params["tam_buffer_receptor"]])
+        plot["vlines"]["lv_fin_transitorio"].set_xdata([fin_estado_transitorio(), fin_estado_transitorio()])
+        canvas.draw_idle()
+
+    apply_btn = tkinter.Button(config_bar, text="Aplicar", command=apply_params)
+    apply_btn.pack(side=tkinter.LEFT, padx=2, pady=2)
+
+    mpl_toolbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
+    canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=True)
+
+    tkinter.mainloop()
 
 
 def setup_plots():
-    plt.rcParams.update({"font.size": 14})
+    plt.rcParams.update({"font.size": 12})
     fig = plt.figure(figsize=(15, 10))
     gs = gridspec.GridSpec(5, 1)
     ax_salida = fig.add_subplot(gs[0])
@@ -106,21 +206,21 @@ def setup_plots():
     ax_recibidos = fig.add_subplot(gs[4])
 
     (l_salida,) = ax_salida.plot([], [], label="Ocupacion del Buffer")
-    ax_salida.axhline(y=nivel_deseado, linestyle=":", label="Valor nominal")
-    ax_salida.axvline(
-        x=fin_estado_transitorio,
+    lh_valor_nominal = ax_salida.axhline(y=nivel_deseado(), linestyle=":", label="Valor nominal")
+    lv_fin_transitorio = ax_salida.axvline(
+        x=fin_estado_transitorio(),
         color="g",
         linestyle=":",
         label="Fin de Estado Transitorio",
     )
-
-    (l_error,) = ax_error.plot([], [], label="Señal de error")
-    ax_error.axhline(
-        y=tam_buffer_receptor,
+    lh_limite_error = ax_salida.axhline(
+        y=params["tam_buffer_receptor"],
         color="r",
         linestyle="--",
         label="Límite de error (100% ocupación)",
     )
+
+    (l_error,) = ax_error.plot([], [], label="Señal de error")
 
     (l_controlador,) = ax_controlador.plot(
         [], [], label="Salida del Controlador (Bytes enviados)"
@@ -137,12 +237,13 @@ def setup_plots():
     for ax in (ax_salida, ax_error, ax_controlador, ax_perturbacion, ax_recibidos):
         ax.set_ylabel("Bytes")
         ax.grid(True)
-        ax.legend(loc="best")
+        ax.legend()
         ax.set_xbound(lower=0)
-        ax.set_xlim(0, 2000)
+        # ax.set_xlim(0, 2000) #Si queremos que todos los graficos esten limitados inicialmente entre 0 y 2000 bytes
 
     ax_recibidos.set_xlabel("Tiempo (milisegundos)")
 
+    # Todos los objetos
     return {
         "fig": fig,
         "axes": {
@@ -158,6 +259,13 @@ def setup_plots():
             "controlador": l_controlador,
             "perturbacion": l_perturbacion,
             "recibidos": l_recibidos,
+        },
+        "hlines": {
+            "lh_valor_nominal": lh_valor_nominal,
+            "lh_limite_error": lh_limite_error,
+        },
+        "vlines": {
+            "lv_fin_transitorio": lv_fin_transitorio,
         },
     }
 
