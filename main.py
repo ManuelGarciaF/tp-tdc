@@ -178,7 +178,7 @@ def main():
         label = tkinter.Label(config_bar, text=key)
         label.pack(side=tkinter.LEFT, padx=2, pady=2)
 
-        var = tkinter.StringVar(value=str(val))
+        var = tkinter.StringVar(master=config_bar, value=str(val))
         entry = tkinter.Entry(config_bar, textvariable=var, width=10)
         entry.pack(side=tkinter.LEFT, padx=2, pady=2)
         entries[key] = {"var": var, "entry": entry}
