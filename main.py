@@ -48,8 +48,8 @@ def gen_pasos():
         datos_recibidos = max(salida_controlador + perturbacion, 0)
         perdida = -perturbacion if salida_controlador > 0 else 0
 
-        ocupacion_buffer += datos_recibidos 
-        ocupacion_buffer = max(ocupacion_buffer - params["consumo_aplicacion"], 0) 
+        ocupacion_buffer += datos_recibidos
+        ocupacion_buffer = max(ocupacion_buffer - params["consumo_aplicacion"], 0)
 
         yield t, espacio_disponible, salida_controlador, perdida, datos_recibidos, ocupacion_buffer
 
@@ -181,11 +181,13 @@ def main():
         var = tkinter.StringVar(value=str(val))
         entry = tkinter.Entry(config_bar, textvariable=var, width=10)
         entry.pack(side=tkinter.LEFT, padx=2, pady=2)
-        entries[key] = var
+        entries[key] = {"var": var, "entry": entry}
 
     def apply_params():
-        for key, var in entries.items():
-            params[key] = float(var.get())
+        for key, entry in entries.items():
+            val = entry["var"].get()
+            if val:
+                params[key] = float(entry["var"].get())
 
         # Actualizar reglas
         plot["hlines"]["lh_valor_nominal"].set_ydata([nivel_deseado(), nivel_deseado()])
