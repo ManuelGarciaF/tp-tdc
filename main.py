@@ -12,12 +12,12 @@ import random
 # Parametros
 #
 
-tiempo_total = 2* 1000  # ms
-tiempo_paso_simulacion = 50 #ms, tiempo para graficar cada ciclo
+tiempo_total = 2000  # ms
+tiempo_paso_simulacion = 200 # ms, tiempo para graficar cada ciclo
 
 # Configurables mediante casillas de texto
 params = {
-    "tam_buffer_receptor": 16 * 1000, # Bytes, determina el error superior
+    "tam_buffer_receptor": 16000,     # Bytes, determina el error superior
     "nivel_deseado_porcentaje": 0.95, # Valor nominal
     "mss": 536,                       # Tamaño máximo por ciclo
     "tiempo_scan": 14,                # Tiempo de scan
@@ -185,10 +185,7 @@ def main():
 
     def apply_params():
         for key, var in entries.items():
-            try:
-                params[key] = int(var.get())
-            except ValueError:
-                params[key] = float(var.get())
+            params[key] = float(var.get())
 
         # Actualizar reglas
         plot["hlines"]["lh_valor_nominal"].set_ydata([nivel_deseado(), nivel_deseado()])
@@ -202,6 +199,7 @@ def main():
     # mpl_toolbar.pack(side=tkinter.BOTTOM, fill=tkinter.X)
     canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=True)
 
+    root.update()
     tkinter.mainloop()
 
 
