@@ -17,21 +17,23 @@ tiempo_paso_simulacion = 200 # ms, tiempo para graficar cada ciclo
 
 # Configurables mediante casillas de texto
 params = {
-    "tam_buffer_receptor": 16000,     # Bytes, determina el error superior
-    "nivel_deseado_porcentaje": 0.95, # Valor nominal
+    "tam buffer rx": 16000,     # Bytes, determina el error superior
+    "nivel deseado (%)": 0.95, # Valor nominal
     "mss": 536,                       # Tamaño máximo por ciclo
-    "tiempo_scan": 14,                # Tiempo de scan
-    "consumo_aplicacion": 128,        # Numero de bytes consumidos por ciclo
+    "tiempo scan": 14,                # Tiempo de scan
+    "consumo aplicacion": 128,        # Numero de bytes consumidos por ciclo
+    "probabilidad perturbacion": 20,
+    "limite bits perturbados": 64,
 }
 
 
 def nivel_deseado():
-    return params["nivel_deseado_porcentaje"] * params["tam_buffer_receptor"]
+    return params["nivel deseado (%)"] * params["tam buffer rx"]
 
 
 def fin_estado_transitorio():
-    cambio_total = params["mss"] - params["consumo_aplicacion"]
-    return nivel_deseado() * (params["tiempo_scan"] / cambio_total)
+    cambio_total = params["mss"] - params["consumo aplicacion"]
+    return nivel_deseado() * (params["tiempo scan"] / cambio_total)
 
 
 #
@@ -41,7 +43,7 @@ def gen_pasos():
     t = 0
     ocupacion_buffer = 0
     while True:
-        t += params["tiempo_scan"]
+        t += params["tiempo scan"]
         espacio_disponible = nivel_deseado() - ocupacion_buffer
         salida_controlador = min(espacio_disponible, params["mss"])
         perturbacion = perturbacion_por_perdida()
@@ -49,18 +51,15 @@ def gen_pasos():
         perdida = -perturbacion if salida_controlador > 0 else 0
 
         ocupacion_buffer += datos_recibidos
-        ocupacion_buffer = max(ocupacion_buffer - params["consumo_aplicacion"], 0)
+        ocupacion_buffer = max(ocupacion_buffer - params["consumo aplicacion"], 0)
 
         yield t, espacio_disponible, salida_controlador, perdida, datos_recibidos, ocupacion_buffer
 
 
 def perturbacion_por_perdida():
-    # 80% de las veces no hay perdidas
-    if random.randint(0, 5) != 0:
-        return 0
-
-    # El 10% de las veces perdemos entre 1 y 64 bits
-    return -random.randint(1, 64)
+    if random.randint(0, 99) <= params["probabilidad perturbacion"]:
+        return -random.randint(1, int(params["limite bits perturbados"]))
+    return 0
 
 
 #
@@ -68,6 +67,7 @@ def perturbacion_por_perdida():
 #
 def main():
     salidas = [0]
+    mediciones = [0]
     errores = [0]
     salidas_controlador = [0]
     recibidos = [0]
@@ -93,7 +93,7 @@ def main():
             ocupacion_buffer,
         ) = data
         tiempos.append(t)
-
+        mediciones.append(ocupacion_buffer)
         errores.append(espacio_disponible)
         salidas_controlador.append(salida_controlador)
         perdidas.append(perdida)
@@ -101,6 +101,7 @@ def main():
         salidas.append(ocupacion_buffer)
 
         plot["lines"]["salida"].set_data(tiempos, salidas)
+        plot["lines"]["medicion"].set_data(tiempos, mediciones)
         plot["lines"]["error"].set_data(tiempos, errores)
         plot["lines"]["controlador"].set_data(tiempos, salidas_controlador)
         plot["lines"]["perturbacion"].set_data(tiempos, perdidas)
@@ -135,6 +136,7 @@ def main():
 
         for data_list in (
             salidas,
+            mediciones,
             errores,
             salidas_controlador,
             recibidos,
@@ -142,6 +144,7 @@ def main():
             tiempos,
         ):
             data_list.clear()
+
         for line in plot["lines"].values():
             line.set_data([], [])
 
@@ -160,17 +163,7 @@ def main():
     config_bar = tkinter.Frame(master=root)
     config_bar.pack(side=tkinter.TOP, fill=tkinter.X)
 
-    button_pause = tkinter.Button(
-        master=config_bar, text="Pausar", command=ani.event_source.stop
-    )
-    button_resume = tkinter.Button(
-        master=config_bar, text="Resumir", command=ani.event_source.start
-    )
-
     button_reset = tkinter.Button(master=config_bar, text="Reiniciar", command=reset)
-
-    button_pause.pack(side=tkinter.LEFT, padx=2, pady=2)
-    button_resume.pack(side=tkinter.LEFT, padx=2, pady=2)
     button_reset.pack(side=tkinter.LEFT, padx=2, pady=2)
 
     entries = {}
@@ -188,10 +181,11 @@ def main():
             val = entry["var"].get()
             if val:
                 params[key] = float(entry["var"].get())
+                canvas.draw()
 
         # Actualizar reglas
         plot["hlines"]["lh_valor_nominal"].set_ydata([nivel_deseado(), nivel_deseado()])
-        plot["hlines"]["lh_limite_error"].set_ydata([params["tam_buffer_receptor"], params["tam_buffer_receptor"]])
+        plot["hlines"]["lh_limite_error"].set_ydata([params["tam buffer rx"], params["tam buffer rx"]])
         plot["vlines"]["lv_fin_transitorio"].set_xdata([fin_estado_transitorio(), fin_estado_transitorio()])
         canvas.draw_idle()
 
@@ -208,12 +202,13 @@ def main():
 def setup_plots():
     plt.rcParams.update({"font.size": 12})
     fig = plt.figure(figsize=(15, 10))
-    gs = gridspec.GridSpec(5, 1)
+    gs = gridspec.GridSpec(6, 1)
     ax_salida = fig.add_subplot(gs[0])
-    ax_error = fig.add_subplot(gs[1])
-    ax_controlador = fig.add_subplot(gs[2])
-    ax_perturbacion = fig.add_subplot(gs[3])
-    ax_recibidos = fig.add_subplot(gs[4])
+    ax_medicion = fig.add_subplot(gs[1])
+    ax_error = fig.add_subplot(gs[2])
+    ax_controlador = fig.add_subplot(gs[3])
+    ax_perturbacion = fig.add_subplot(gs[4])
+    ax_recibidos = fig.add_subplot(gs[5])
 
     (l_salida,) = ax_salida.plot([], [], label="Ocupacion del Buffer")
     lh_valor_nominal = ax_salida.axhline(y=nivel_deseado(), linestyle=":", label="Valor nominal")
@@ -224,13 +219,15 @@ def setup_plots():
         label="Fin de Estado Transitorio",
     )
     lh_limite_error = ax_salida.axhline(
-        y=params["tam_buffer_receptor"],
+        y=params["tam buffer rx"],
         color="r",
         linestyle="--",
         label="Límite de error (100% ocupación)",
     )
 
-    (l_error,) = ax_error.plot([], [], label="Señal de error")
+    (l_medicion,) = ax_medicion.plot([], [], label="Medición de capacidad")
+
+    (l_error,) = ax_error.plot([], [], label="Señal de error (espacio a llenar)")
 
     (l_controlador,) = ax_controlador.plot(
         [], [], label="Salida del Controlador (Bytes enviados)"
@@ -244,7 +241,7 @@ def setup_plots():
 
     # Titles and labels
     ax_salida.set_title("Simulación de control de flujo TCP")
-    for ax in (ax_salida, ax_error, ax_controlador, ax_perturbacion, ax_recibidos):
+    for ax in (ax_salida, ax_medicion, ax_error, ax_controlador, ax_perturbacion, ax_recibidos):
         ax.set_ylabel("Bytes")
         ax.grid(True)
         ax.legend(loc="lower right")
@@ -258,6 +255,7 @@ def setup_plots():
         "fig": fig,
         "axes": {
             "salida": ax_salida,
+            "medicion": ax_medicion,
             "error": ax_error,
             "controlador": ax_controlador,
             "perturbacion": ax_perturbacion,
@@ -265,6 +263,7 @@ def setup_plots():
         },
         "lines": {
             "salida": l_salida,
+            "medicion": l_medicion,
             "error": l_error,
             "controlador": l_controlador,
             "perturbacion": l_perturbacion,
