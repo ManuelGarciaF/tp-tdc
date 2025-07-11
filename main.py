@@ -23,7 +23,7 @@ params = {
     "tiempo scan": 14,               # Tiempo de scan
     "consumo aplicacion": 128,       # Numero de bytes consumidos por ciclo
     "probabilidad perturbacion": 20, # Dada como porcentaje, un número entre 0 y 100
-    "limite bits perturbados": 64,   # El número de bits perdidos va entre 0 y este número
+    "limite bytes perturbados": 64,  # El número de bytes perdidos va entre 0 y este número
 }
 
 
@@ -58,7 +58,7 @@ def gen_pasos():
 
 def perturbacion_por_perdida():
     if random.randint(0, 99) <= params["probabilidad perturbacion"]:
-        return -random.randint(1, int(params["limite bits perturbados"]))
+        return -random.randint(1, int(params["limite bytes perturbados"]))
     return 0
 
 

@@ -5,7 +5,6 @@
 - Simulación animada del buffer receptor y el controlador TCP.
 - Gráficas en tiempo real de diferentes variables del sistema.
 - Modificación de parámetros desde la interfaz mediante casillas de texto.
-- Botones para pausar, reanudar y reiniciar la simulación.
 
 ## Requisitos
 
