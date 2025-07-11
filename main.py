@@ -17,13 +17,13 @@ tiempo_paso_simulacion = 200 # ms, tiempo para graficar cada ciclo
 
 # Configurables mediante casillas de texto
 params = {
-    "tam buffer rx": 16000,     # Bytes, determina el error superior
-    "nivel deseado (%)": 0.95, # Valor nominal
-    "mss": 536,                       # Tamaño máximo por ciclo
-    "tiempo scan": 14,                # Tiempo de scan
-    "consumo aplicacion": 128,        # Numero de bytes consumidos por ciclo
-    "probabilidad perturbacion": 20,
-    "limite bits perturbados": 64,
+    "tam buffer rx": 16000,          # Bytes, determina el error superior
+    "nivel deseado (%)": 0.95,       # Valor nominal
+    "mss": 536,                      # Tamaño máximo por ciclo
+    "tiempo scan": 14,               # Tiempo de scan
+    "consumo aplicacion": 128,       # Numero de bytes consumidos por ciclo
+    "probabilidad perturbacion": 20, # Dada como porcentaje, un número entre 0 y 100
+    "limite bits perturbados": 64,   # El número de bits perdidos va entre 0 y este número
 }
 
 
