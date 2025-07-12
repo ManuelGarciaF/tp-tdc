@@ -15,7 +15,11 @@
 ## Uso
 
 1. Clona el repositorio
-2. Ejecuta la aplicación:
+2. Instala los requisitos:
+```sh
+pip install matplotlib
+```
+3. Ejecuta la aplicación:
 
 ```sh
 python3 main.py
