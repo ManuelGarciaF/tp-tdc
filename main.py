@@ -45,7 +45,7 @@ def gen_pasos():
     while True:
         t += params["tiempo scan"]
         espacio_disponible = nivel_deseado() - ocupacion_buffer
-        salida_controlador = min(espacio_disponible, params["mss"])
+        salida_controlador = max(min(espacio_disponible, params["mss"]), 0)
         perturbacion = perturbacion_por_perdida()
         datos_recibidos = max(salida_controlador + perturbacion, 0)
         perdida = -perturbacion if salida_controlador > 0 else 0
@@ -57,7 +57,7 @@ def gen_pasos():
 
 
 def perturbacion_por_perdida():
-    if random.randint(0, 99) <= params["probabilidad perturbacion"]:
+    if random.randint(0, 100) < params["probabilidad perturbacion"]:
         return -random.randint(1, int(params["limite bytes perturbados"]))
     return 0
 
